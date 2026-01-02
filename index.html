@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>我愛喝搖搖杯</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="搖搖杯">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+
+        :root {
+            --zen-bg: #fcfaf2;
+            --zen-border: #e6e2d3;
+            --zen-green: #6b705c;
+            --zen-brown: #a5a58d;
+            --zen-text: #3d3d3d;
+            --zen-sub: #8d8d8d;
+        }
+
+        body {
+            background-color: var(--zen-bg);
+            color: var(--zen-text);
+            font-family: "Noto Sans TC", sans-serif;
+            letter-spacing: 0.02em;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            border-top: 1px solid var(--zen-border);
+            border-left: 1px solid var(--zen-border);
+        }
+        .day-cell {
+            aspect-ratio: 1 / 1.1;
+            background: white;
+            border-right: 1px solid var(--zen-border);
+            border-bottom: 1px solid var(--zen-border);
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        .day-cell.selected {
+            background-color: #f0f0e8;
+            outline: 2px solid var(--zen-green);
+            z-index: 10;
+        }
+        .day-cell.today { background-color: #fdfcea; }
+        .day-cell.today span { color: var(--zen-brown); font-weight: bold; }
+
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            height: 70px;
+            background: rgba(252, 250, 242, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--zen-border);
+            display: flex;
+            padding-bottom: env(safe-area-inset-bottom);
+            z-index: 40;
+        }
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            color: var(--zen-sub);
+        }
+        .nav-item.active { color: var(--zen-green); font-weight: bold; }
+
+        .top-action-btn {
+            position: fixed;
+            top: 20px;
+            z-index: 100;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border: 1px solid var(--zen-border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+        .top-action-btn:active { transform: scale(0.9); }
+        .btn-add { right: 20px; background: var(--zen-green); color: white; border: none; }
+        .btn-settings { right: 74px; color: var(--zen-text); }
+
+        .zen-btn {
+            border: 1px solid var(--zen-border);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            background: white;
+        }
+        .zen-btn.active { background: var(--zen-green); color: white; border-color: var(--zen-green); }
+        
+        .zen-input {
+            border-bottom: 1px solid var(--zen-border);
+            width: 100%;
+            padding: 10px 0;
+            outline: none;
+            background: transparent;
+        }
+
+        .record-card {
+            background: white;
+            border: 1px solid var(--zen-border);
+            padding: 14px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 可愛無內容狀態 */
+        .empty-state-cute {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 0;
+            color: var(--zen-sub);
+            opacity: 0.5;
+        }
+        .empty-icon { font-size: 40px; margin-bottom: 10px; animation: wobble 2s infinite ease-in-out; }
+        @keyframes wobble {
+            0%, 100% { transform: rotate(-5deg); }
+            50% { transform: rotate(5deg); }
+        }
+    </style>
+</head>
+<body class="pb-24">
+
+    <!-- 右上角按鈕 -->
+    <button onclick="openEntryForm()" class="top-action-btn btn-add">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    </button>
+    <button onclick="switchTab('manage')" class="top-action-btn btn-settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    </button>
+
+    <!-- 頁面: 首頁 -->
+    <div id="page-home" class="tab-content active">
+        <header class="p-12 text-center">
+            <h1 class="text-2xl font-medium tracking-[0.2em]">搖搖杯指南</h1>
+            <p class="text-[9px] opacity-40 mt-2 uppercase tracking-[0.3em] italic">Daily Selection</p>
+        </header>
+        <div class="px-8 flex flex-col items-center justify-center min-h-[50vh] space-y-10">
+            <div id="recommendArea" class="w-full text-center bg-white p-10 rounded-[2rem] border border-[--zen-border] shadow-sm">
+                <p class="text-xs opacity-40 mb-6 tracking-widest">今日來杯搖搖杯嗎？</p>
+                <div id="recommendContent">
+                    <p class="text-lg text-[--zen-sub] font-light">點擊下方按鈕<br>尋找今日靈感</p>
+                </div>
+            </div>
+            <button onclick="getRecommendation()" class="w-20 h-20 rounded-full bg-[--zen-green] text-white shadow-xl flex items-center justify-center transition active:scale-90">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- 頁面: 日誌 -->
+    <div id="page-calendar" class="tab-content">
+        <header class="pt-10 pb-6 text-center">
+            <h1 class="text-xl font-medium tracking-widest">飲用日誌</h1>
+        </header>
+        <div class="px-6 mb-4 flex items-center justify-between">
+            <button onclick="moveMonth(-1)" class="w-10 h-10 opacity-30">❮</button>
+            <div id="calendarTitle" class="text-sm font-medium tracking-tighter">Date</div>
+            <button onclick="moveMonth(1)" class="w-10 h-10 opacity-30">❯</button>
+        </div>
+        <div class="px-4">
+            <div class="calendar-grid bg-white rounded-lg overflow-hidden shadow-sm border-r border-b border-[--zen-border]">
+                <div class="text-[8px] py-2 text-center opacity-30 border-r border-b border-[--zen-border]">SUN</div>
+                <div class="text-[8px] py-2 text-center opacity-30 border-r border-b border-[--zen-border]">MON</div>
+                <div class="text-[8px] py-2 text-center opacity-30 border-r border-b border-[--zen-border]">TUE</div>
+                <div class="text-[8px] py-2 text-center opacity-30 border-r border-b border-[--zen-border]">WED</div>
+                <div class="text-[8px] py-2 text-center opacity-30 border-r border-b border-[--zen-border]">THU</div>
+                <div class="text-[8px] py-2 text-center opacity-30 border-r border-b border-[--zen-border]">FRI</div>
+                <div class="text-[8px] py-2 text-center opacity-30 border-r border-b border-[--zen-border]">SAT</div>
+                <div id="calendarDays" class="contents"></div>
+            </div>
+        </div>
+        <div class="mt-8 px-6 pb-10">
+            <div class="flex items-center justify-between mb-4 border-b border-[--zen-border] pb-2">
+                <span id="selectedDateLabel" class="text-xs font-bold tracking-widest opacity-60 uppercase">請選擇日期</span>
+                <span id="dayCountLabel" class="text-[10px] opacity-40"></span>
+            </div>
+            <div id="dayRecordsInline"></div>
+        </div>
+    </div>
+
+    <!-- 頁面: 統計 -->
+    <div id="page-stats" class="tab-content">
+        <header class="p-10 text-center">
+            <h1 class="text-xl font-medium tracking-widest">數據統計</h1>
+        </header>
+        <div class="px-8 space-y-6 pb-10">
+            <div class="bg-white border border-[--zen-border] rounded-xl p-3 flex gap-2">
+                <select id="filterYear" onchange="renderStats()" class="flex-1 bg-transparent text-xs outline-none"></select>
+                <select id="filterMonth" onchange="renderStats()" class="flex-1 bg-transparent text-xs outline-none">
+                    <option value="all">全年度</option>
+                    <option value="01">1月</option><option value="02">2月</option><option value="03">3月</option>
+                    <option value="04">4月</option><option value="05">5月</option><option value="06">6月</option>
+                    <option value="07">7月</option><option value="08">8月</option><option value="09">9月</option>
+                    <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+                </select>
+            </div>
+            
+            <button onclick="exportToCSV()" class="w-full py-3 bg-white border border-[--zen-border] rounded-xl text-[10px] tracking-[0.2em] opacity-60 flex items-center justify-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                匯出 CSV 報表
+            </button>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white p-6 border border-[--zen-border] rounded-xl text-center">
+                    <p class="text-[9px] opacity-40 mb-1 tracking-widest uppercase">總杯數</p>
+                    <p id="statCount" class="text-2xl font-light">0</p>
+                </div>
+                <div class="bg-white p-6 border border-[--zen-border] rounded-xl text-center">
+                    <p class="text-[9px] opacity-40 mb-1 tracking-widest uppercase">總金額</p>
+                    <p id="statSpend" class="text-2xl font-light">$0</p>
+                </div>
+            </div>
+
+            <!-- 最愛統計 -->
+            <div class="grid grid-cols-1 gap-4">
+                <div class="bg-white p-5 border border-[--zen-border] rounded-xl">
+                    <p class="text-[9px] opacity-40 mb-2 tracking-widest uppercase font-bold">最愛店家</p>
+                    <p id="statFavShop" class="text-base font-medium text-[--zen-green]">尚未有紀錄</p>
+                </div>
+                <div class="bg-white p-5 border border-[--zen-border] rounded-xl">
+                    <p class="text-[9px] opacity-40 mb-2 tracking-widest uppercase font-bold">最愛飲品</p>
+                    <p id="statFavDrink" class="text-base font-medium text-[--zen-brown]">尚未有紀錄</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 border border-[--zen-border] rounded-xl">
+                <p class="text-[10px] opacity-50 mb-6 tracking-widest font-bold uppercase">店家佔比</p>
+                <div id="statShops" class="space-y-6"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 頁面: 管理 -->
+    <div id="page-manage" class="tab-content">
+        <header class="p-10 text-center">
+            <h1 class="text-xl font-medium tracking-widest">系統管理</h1>
+        </header>
+        <div class="px-8 space-y-6 pb-20">
+            <!-- 配料管理 -->
+            <div class="bg-white p-6 border border-[--zen-border] rounded-xl">
+                <p class="text-[10px] opacity-50 mb-4 tracking-widest font-bold uppercase">Toppings / 配料管理</p>
+                <div id="toppingList" class="flex flex-wrap gap-2 mb-6"></div>
+                <div class="flex gap-2">
+                    <input type="text" id="newToppingInput" placeholder="新增自定義配料" class="flex-1 zen-input text-sm">
+                    <button onclick="addToppingFromManage()" class="bg-[--zen-text] text-white px-4 py-2 rounded text-xs">加入</button>
+                </div>
+            </div>
+
+            <!-- 備份還原 -->
+            <div class="bg-white p-6 border border-[--zen-border] rounded-xl">
+                <p class="text-[10px] opacity-50 mb-4 tracking-widest font-bold uppercase">Backup / 備份與還原</p>
+                <div class="space-y-4">
+                    <button onclick="exportBackup()" class="w-full py-3 border border-[--zen-border] rounded-lg text-xs flex items-center justify-center gap-2 active:bg-gray-50">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        導出備份代碼
+                    </button>
+                    <div class="pt-2 border-t border-dashed">
+                        <p class="text-[9px] opacity-40 mb-2">請在此貼上備份代碼進行還原：</p>
+                        <textarea id="importArea" class="w-full h-20 p-2 text-[10px] border border-[--zen-border] rounded bg-gray-50/50 mb-2 outline-none" placeholder="貼上備份內容..."></textarea>
+                        <button onclick="importBackup()" class="w-full py-3 bg-[--zen-text] text-white rounded-lg text-xs">還原資料</button>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="switchTab('home')" class="w-full py-4 border border-[--zen-border] rounded-xl text-xs opacity-50">返回首頁</button>
+        </div>
+    </div>
+
+    <!-- 導覽列 -->
+    <nav class="nav-bar">
+        <div onclick="switchTab('home')" id="nav-home" class="nav-item active">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mb-1"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>首頁
+        </div>
+        <div onclick="switchTab('calendar')" id="nav-calendar" class="nav-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mb-1"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line></svg>日誌
+        </div>
+        <div onclick="switchTab('stats')" id="nav-stats" class="nav-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mb-1"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>統計
+        </div>
+    </nav>
+
+    <!-- Modal: Form -->
+    <div id="formModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/40 px-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl">
+            <div class="p-6 border-b flex justify-between items-center">
+                <button onclick="closeFormModal()" class="w-8 h-8 flex items-center justify-center opacity-40">&times;</button>
+                <span id="formTitle" class="text-xs tracking-widest font-bold text-[--zen-green]">新增飲品</span>
+                <div class="w-8"></div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-8 space-y-8">
+                <div class="space-y-4">
+                    <input type="date" id="f-date" class="zen-input text-sm opacity-50">
+                    <input type="text" id="f-shop" placeholder="店家名稱" class="zen-input text-sm">
+                    <input type="text" id="f-item" placeholder="品項名稱" class="zen-input text-sm">
+                    <input type="number" id="f-price" placeholder="價格 $" class="zen-input text-sm">
+                </div>
+                <div class="space-y-3">
+                    <p class="text-[8px] opacity-30 font-bold uppercase tracking-widest">Ice / 冰塊</p>
+                    <div id="iceGroup" class="grid grid-cols-3 gap-2"></div>
+                </div>
+                <div class="space-y-3">
+                    <p class="text-[8px] opacity-30 font-bold uppercase tracking-widest">Sugar / 甜度</p>
+                    <div id="sugarGroup" class="grid grid-cols-3 gap-2"></div>
+                </div>
+                <div class="space-y-3">
+                    <p class="text-[8px] opacity-30 font-bold uppercase tracking-widest">Topping / 配料</p>
+                    <div class="flex gap-2 mb-2">
+                        <input type="text" id="f-new-topping" placeholder="輸入新配料..." class="flex-1 text-[10px] border-b outline-none py-1 bg-transparent">
+                        <button onclick="addNewToppingFromForm()" class="text-[10px] bg-[--zen-green] text-white px-3 py-1 rounded">新增</button>
+                    </div>
+                    <div id="toppingGroup" class="grid grid-cols-3 gap-2"></div>
+                </div>
+            </div>
+            <div class="p-6 flex gap-2 border-t bg-gray-50/50">
+                <button id="deleteBtn" onclick="deleteEntry()" class="hidden px-4 py-3 border border-red-100 text-red-400 rounded-xl text-[10px]">刪除</button>
+                <button onclick="saveEntry()" class="flex-1 py-3 bg-[--zen-text] text-white rounded-xl text-[10px] tracking-widest">確認保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 訊息提示視窗 -->
+    <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 bg-black/80 text-white text-xs rounded-full opacity-0 pointer-events-none transition-opacity duration-300 z-[200]"></div>
+
+    <script>
+        const DB_KEY = 'SHAKE_DRINK_ZEN_PRO_V5';
+        const TOPPING_KEY = 'SHAKE_DRINK_ZEN_TOPPINGS_V5';
+        
+        let records = JSON.parse(localStorage.getItem(DB_KEY) || '{}');
+        let myToppings = JSON.parse(localStorage.getItem(TOPPING_KEY) || '["珍珠", "粉圓", "粉粿", "愛玉", "椰果"]');
+        
+        const today = new Date();
+        let curMonth = today.getMonth();
+        let curYear = today.getFullYear();
+        let activeDateStr = today.toISOString().split('T')[0];
+        const todayStr = activeDateStr;
+
+        let editingIdx = -1;
+        let tempIce = "微冰", tempSugar = "微糖", tempToppings = [];
+
+        function init() {
+            initFilters();
+            renderCalendar();
+            selectDay(activeDateStr);
+            renderToppingManager();
+            renderStats();
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.replace('opacity-0', 'opacity-100');
+            setTimeout(() => t.classList.replace('opacity-100', 'opacity-0'), 2000);
+        }
+
+        function initFilters() {
+            const yearSel = document.getElementById('filterYear');
+            const currentY = new Date().getFullYear();
+            yearSel.innerHTML = '';
+            for(let y = currentY + 1; y >= 2024; y--) {
+                yearSel.innerHTML += `<option value="${y}" ${y === currentY ? 'selected' : ''}>${y} 年</option>`;
+            }
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            document.getElementById(`page-${tab}`).classList.add('active');
+            const nav = document.getElementById(`nav-${tab}`);
+            if(nav) nav.classList.add('active');
+            
+            if(tab === 'stats') renderStats();
+            if(tab === 'calendar') {
+                renderCalendar();
+                selectDay(activeDateStr);
+            }
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendarDays');
+            grid.innerHTML = '';
+            document.getElementById('calendarTitle').innerText = `${curYear} / ${String(curMonth+1).padStart(2,'0')}`;
+            const first = new Date(curYear, curMonth, 1).getDay();
+            const days = new Date(curYear, curMonth+1, 0).getDate();
+            for(let i=0; i<first; i++) grid.innerHTML += `<div class="day-cell bg-[#fafafa]/50 border-r border-b border-[--zen-border]"></div>`;
+            for(let d=1; d<=days; d++) {
+                const ds = `${curYear}-${String(curMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const list = records[ds] || [];
+                const isSelected = ds === activeDateStr;
+                const isToday = ds === todayStr;
+                let dots = list.length ? `<div class="flex gap-0.5 mt-auto mb-1">${list.map((_,idx)=>`<span class="w-1 h-1 rounded-full ${idx===0?'bg-[--zen-brown]':'bg-[--zen-green]'}"></span>`).join('')}</div>` : '';
+                grid.innerHTML += `
+                    <div class="day-cell border-r border-b border-[--zen-border] ${isSelected?'selected':''} ${isToday?'today':''}" onclick="selectDay('${ds}')">
+                        <span class="text-[10px] ${isSelected?'text-[--zen-green] font-bold':(isToday?'text-[--zen-brown] font-bold':'opacity-30')}">${d}</span>
+                        ${dots}
+                    </div>`;
+            }
+        }
+
+        function selectDay(ds) {
+            activeDateStr = ds;
+            document.getElementById('selectedDateLabel').innerText = ds === todayStr ? `今日 (${ds})` : ds;
+            renderCalendar();
+            renderDayRecordsInline();
+        }
+
+        function renderDayRecordsInline() {
+            const list = records[activeDateStr] || [];
+            const container = document.getElementById('dayRecordsInline');
+            document.getElementById('dayCountLabel').innerText = list.length ? `${list.length} 杯紀錄` : '';
+            if(!list.length) {
+                container.innerHTML = `
+                    <div class="empty-state-cute">
+                        <div class="empty-icon">🥤</div>
+                        <p class="text-[11px] font-medium tracking-widest">這天沒有喝搖搖杯唷！</p>
+                        <p class="text-[9px] mt-1 opacity-60">清清腸胃，明天再戰 (๑•̀ㅂ•́)و</p>
+                    </div>`;
+                return;
+            }
+            container.innerHTML = list.map((it, idx) => `
+                <div class="record-card" onclick="openEntryForm(${idx})">
+                    <div class="flex justify-between font-medium text-xs mb-1">
+                        <span>${it.shop}</span>
+                        <span class="text-[--zen-brown]">$${it.price}</span>
+                    </div>
+                    <div class="text-[10px] opacity-60 mb-2">${it.item}</div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="px-1.5 py-0.5 bg-[--zen-bg] rounded text-[8px] opacity-60">${it.ice}</span>
+                        <span class="px-1.5 py-0.5 bg-[--zen-bg] rounded text-[8px] opacity-60">${it.sugar}</span>
+                        ${it.toppings.map(t=>`<span class="px-1.5 py-0.5 bg-[--zen-border]/30 rounded text-[8px] opacity-60">${t}</span>`).join('')}
+                    </div>
+                </div>`).join('');
+        }
+
+        function openEntryForm(idx = -1) {
+            editingIdx = idx;
+            document.getElementById('f-date').value = activeDateStr;
+            const data = idx===-1 ? {shop:'',item:'',price:'',ice:'微冰',sugar:'微糖',toppings:[]} : records[activeDateStr][idx];
+            document.getElementById('formTitle').innerText = idx===-1 ? '新增飲品' : '編輯紀錄';
+            document.getElementById('f-shop').value = data.shop;
+            document.getElementById('f-item').value = data.item;
+            document.getElementById('f-price').value = data.price;
+            tempIce = data.ice; tempSugar = data.sugar; tempToppings = [...data.toppings];
+            renderFormBtns();
+            document.getElementById('deleteBtn').classList.toggle('hidden', idx===-1);
+            document.getElementById('formModal').classList.remove('hidden');
+        }
+
+        function renderFormBtns() {
+            document.getElementById('iceGroup').innerHTML = ["正常","少冰","微冰","去冰","常溫","熱"].map(o=>`<button onclick="tempIce='${o}';renderFormBtns()" class="zen-btn ${tempIce===o?'active':''} text-[10px]">${o}</button>`).join('');
+            document.getElementById('sugarGroup').innerHTML = ["全糖","少糖","半糖","微糖","一分糖","無糖"].map(o=>`<button onclick="tempSugar='${o}';renderFormBtns()" class="zen-btn ${tempSugar===o?'active':''} text-[10px]">${o}</button>`).join('');
+            document.getElementById('toppingGroup').innerHTML = myToppings.map(o=>`<button onclick="toggleTop('${o}')" class="zen-btn ${tempToppings.includes(o)?'active':''} text-[10px]">${o}</button>`).join('');
+        }
+
+        function toggleTop(t) {
+            const i = tempToppings.indexOf(t);
+            if(i>-1) tempToppings.splice(i,1); else tempToppings.push(t);
+            renderFormBtns();
+        }
+
+        function saveEntry() {
+            const dateVal = document.getElementById('f-date').value;
+            const entry = { shop: document.getElementById('f-shop').value || "未知店家", item: document.getElementById('f-item').value || "未知品項", price: document.getElementById('f-price').value || 0, ice: tempIce, sugar: tempSugar, toppings: tempToppings };
+            if (editingIdx !== -1 && dateVal !== activeDateStr) {
+                records[activeDateStr].splice(editingIdx, 1);
+                if(!records[activeDateStr].length) delete records[activeDateStr];
+            }
+            if(!records[dateVal]) records[dateVal] = [];
+            if(editingIdx === -1 || dateVal !== activeDateStr) records[dateVal].push(entry);
+            else records[dateVal][editingIdx] = entry;
+            localStorage.setItem(DB_KEY, JSON.stringify(records));
+            activeDateStr = dateVal;
+            closeFormModal(); selectDay(activeDateStr);
+        }
+
+        function deleteEntry() {
+            records[activeDateStr].splice(editingIdx,1);
+            if(!records[activeDateStr].length) delete records[activeDateStr];
+            localStorage.setItem(DB_KEY, JSON.stringify(records));
+            closeFormModal(); selectDay(activeDateStr);
+        }
+
+        function closeFormModal() { document.getElementById('formModal').classList.add('hidden'); }
+
+        function renderStats() {
+            const selYear = document.getElementById('filterYear').value;
+            const selMonth = document.getElementById('filterMonth').value;
+            let cups = 0, spend = 0, shops = {}, drinks = {};
+            
+            Object.entries(records).forEach(([dateStr, dayList]) => {
+                const [y, m] = dateStr.split('-');
+                if (y !== selYear || (selMonth !== 'all' && m !== selMonth)) return;
+                dayList.forEach(it => {
+                    cups++; spend += parseInt(it.price || 0);
+                    if(it.shop) shops[it.shop] = (shops[it.shop] || 0) + 1;
+                    const drinkKey = `${it.shop}-${it.item}`;
+                    if(it.item) drinks[drinkKey] = (drinks[drinkKey] || 0) + 1;
+                });
+            });
+            
+            document.getElementById('statCount').innerText = cups;
+            document.getElementById('statSpend').innerText = `$${spend.toLocaleString()}`;
+            
+            // 最愛店家與品項
+            const favShop = Object.entries(shops).sort((a,b)=>b[1]-a[1])[0];
+            const favDrink = Object.entries(drinks).sort((a,b)=>b[1]-a[1])[0];
+            document.getElementById('statFavShop').innerText = favShop ? favShop[0] : "尚未有紀錄";
+            document.getElementById('statFavDrink').innerText = favDrink ? favDrink[0].split('-')[1] : "尚未有紀錄";
+
+            const sorted = Object.entries(shops).sort((a,b)=>b[1]-a[1]).slice(0,5);
+            const container = document.getElementById('statShops');
+            container.innerHTML = sorted.length ? '' : '<p class="text-center py-6 opacity-20 text-xs">此期間無紀錄</p>';
+            sorted.forEach(([name, count])=>{
+                const p = Math.round((count/cups)*100);
+                container.innerHTML += `<div><div class="flex justify-between text-[10px] mb-2"><span>${name}</span><span class="opacity-40">${count} 杯 (${p}%)</span></div><div class="w-full bg-[#f0f0f0] h-[3px] rounded-full"><div class="bg-[--zen-green] h-full rounded-full" style="width:${p}%"></div></div></div>`;
+            });
+        }
+
+        function exportToCSV() {
+            const selYear = document.getElementById('filterYear').value;
+            const selMonth = document.getElementById('filterMonth').value;
+            let csvRows = [['日期', '店家', '品項', '價格', '冰塊', '甜度', '配料']];
+            Object.entries(records).sort((a,b) => a[0].localeCompare(b[0])).forEach(([dateStr, dayList]) => {
+                const [y, m] = dateStr.split('-');
+                if (y !== selYear || (selMonth !== 'all' && m !== selMonth)) return;
+                dayList.forEach(it => csvRows.push([dateStr, it.shop, it.item, it.price, it.ice, it.sugar, it.toppings.join('; ')]));
+            });
+            const csvString = '\uFEFF' + csvRows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `搖搖杯紀錄_${selYear}_${selMonth}.csv`;
+            link.click();
+        }
+
+        // 備份功能
+        function exportBackup() {
+            const data = { records, myToppings, version: '5.0' };
+            const encrypted = btoa(encodeURIComponent(JSON.stringify(data)));
+            const area = document.getElementById('importArea');
+            area.value = encrypted;
+            area.select();
+            document.execCommand('copy');
+            showToast('備份代碼已複製到剪貼簿！');
+        }
+
+        function importBackup() {
+            const code = document.getElementById('importArea').value.trim();
+            if(!code) return showToast('請輸入代碼');
+            try {
+                const decrypted = JSON.parse(decodeURIComponent(atob(code)));
+                if(decrypted.records) {
+                    records = decrypted.records;
+                    myToppings = decrypted.myToppings || myToppings;
+                    localStorage.setItem(DB_KEY, JSON.stringify(records));
+                    localStorage.setItem(TOPPING_KEY, JSON.stringify(myToppings));
+                    showToast('資料還原成功！');
+                    setTimeout(()=>location.reload(), 1000);
+                }
+            } catch(e) { showToast('無效的備份代碼'); }
+        }
+
+        function moveMonth(v) { curMonth+=v; if(curMonth<0){curMonth=11;curYear--;} if(curMonth>11){curMonth=0;curYear++;} renderCalendar(); }
+        function getRecommendation() {
+            const picks = [];
+            Object.values(records).forEach(list => list.forEach(it => { if(it.shop && it.item) picks.push(`${it.shop} 的 ${it.item}`); }));
+            const content = document.getElementById('recommendContent');
+            if (!picks.length) return content.innerHTML = `<p class="text-sm font-light text-[--zen-sub]">還沒有紀錄靈感喔！</p>`;
+            const unique = [...new Set(picks)];
+            const picked = unique[Math.floor(Math.random() * unique.length)];
+            content.innerHTML = `<p class="text-xs opacity-40 mb-2 tracking-widest">今日靈感</p><p class="text-xl font-medium text-[--zen-green] tracking-widest leading-relaxed">${picked}</p>`;
+        }
+        function renderToppingManager() {
+            document.getElementById('toppingList').innerHTML = myToppings.map(t=>`<div class="flex items-center gap-2 px-3 py-1.5 bg-white border border-[--zen-border] rounded-full text-xs opacity-70">${t}<button onclick="removeTop('${t}')" class="text-red-300">×</button></div>`).join('');
+        }
+        function addToppingFromManage() {
+            const i = document.getElementById('newToppingInput');
+            if(i.value && !myToppings.includes(i.value)) { myToppings.push(i.value); localStorage.setItem(TOPPING_KEY, JSON.stringify(myToppings)); i.value = ''; renderToppingManager(); }
+        }
+        function removeTop(t) { myToppings = myToppings.filter(i=>i!==t); localStorage.setItem(TOPPING_KEY, JSON.stringify(myToppings)); renderToppingManager(); }
+        function addNewToppingFromForm() {
+            const v = document.getElementById('f-new-topping').value.trim();
+            if(v && !myToppings.includes(v)) { myToppings.push(v); tempToppings.push(v); localStorage.setItem(TOPPING_KEY, JSON.stringify(myToppings)); document.getElementById('f-new-topping').value = ''; renderFormBtns(); renderToppingManager(); }
+        }
+
+        init();
+    </script>
+</body>
+</html>
